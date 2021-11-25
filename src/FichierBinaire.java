@@ -1,5 +1,4 @@
 import java.io.*;
-import java.util.*;
 import java.nio.*;
 import java.nio.channels.*;
 import java.nio.file.*;
@@ -30,9 +29,51 @@ class FichierBinaire {
         while(buf.hasRemaining()) // tant qu’on n’a pas écrit tout le buffer
             f.write(buf);
     }
+    int rechercherIndexProduit(int ref) throws IOException{
+        int index = 1;
+        Produit prod;
+        f.position(0);
+        while((prod=lireProduit())!=null){
+            if(prod.ref == ref)return index;
+            index++;
+        }
+        return -1;
+    }
+    void ajouterProduit(Produit prod) throws IOException {
+        int index = rechercherIndexProduit(prod.ref);
+        if(index >=0){
+           f.position((index-1)*Produit.BYTES);
+           ecrireProduit(prod);
+        }else {
+            f.position(f.size());
+            ecrireProduit(prod);
+        }
+    }
+    void nouvelleQuantite(int ref , int quantite) throws IOException {
+        int index = rechercherIndexProduit(ref);
+        if(index==-1)return;
+        f.position((index-1)*Produit.BYTES);
+        Produit prod = lireProduit();
+        if(prod.quantite+quantite>=0)
+            prod.quantite+=quantite;
+        f.position((index-1)*Produit.BYTES);
+        ecrireProduit(prod);
+    }
+
+    void deleteProduit(int ref) throws IOException {
+        int index = rechercherIndexProduit(ref);
+        if(index == -1)return;
+        f.position(f.size()-Produit.BYTES);
+        Produit prod = lireProduit();
+        f.position((index-1)*Produit.BYTES);
+        ecrireProduit(prod);
+        f.truncate(f.size()-Produit.BYTES);
+    }
+
     /**
      * lire un produit à la position courante du fichier
      */
+
     Produit lireProduit() throws IOException {// copie du fichier vers le tampon
         buf.clear(); // avant d’écrire, on vide le tampon
         while(buf.hasRemaining()) // tant qu’on n’a pas rempli le buffer
@@ -47,6 +88,7 @@ class FichierBinaire {
         prod.quantite = buf.getInt();
         return prod;
     }
+
     FichierBinaire(String filename) throws IOException {
         //ouverture en lecture/écriture, avec création du fichier
         f=FileChannel.open(
@@ -91,11 +133,38 @@ class FichierBinaire {
             pos-=Produit.BYTES;
         }
     }
+
+    public int search(int r) throws IOException {
+        Produit prod;
+        f.position(0);
+        int count=0;
+        // revenir au début du fichier
+        while ((prod = lireProduit()) != null){
+            if(prod.ref ==r){
+                return count*Produit.BYTES;
+            }else {
+                count++;
+            }
+        }
+        return -1;
+    }
+
     void run() throws IOException {
         ecrire();
         lire();
         System.out.println(" ----------------------------------------");
         lireALEnvers();
+        System.out.println(" ----------------------------------------");
+        Produit p = new Produit();
+        p.ref = 1;
+        p.quantite=999;
+        p.prix= 999;
+        ajouterProduit(p);
+        nouvelleQuantite(2,-200);
+        lire();
+        System.out.println(" ----------------------------------------");
+        deleteProduit(3);
+        lire();
         f.close();
     }
     public static void main(String[] args) {
